@@ -106,7 +106,7 @@ async def test_full_night(server_url):
             assert res.structured_content["level"] == "ok"
 
             res = await s.call_tool("start_sleep", {"caregiver": "Sam"})
-            assert "fell asleep" in res.content[0].text
+            assert "asleep at" in res.content[0].text
 
             res = await s.call_tool("add_note", {"text": "Called the nurse line, bring her in at 9", "caregiver": "Sam"})
             res = await s.call_tool("shift_handoff", {"since_hours": 8})

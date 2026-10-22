@@ -91,13 +91,12 @@ class TemperatureTriage:
 
 def triage_temperature(temp_f: float, age_weeks: float, fever_hours: float | None = None) -> TemperatureTriage:
     """Compare one reading with the AAP 'when to call' thresholds."""
-    temp_c = (temp_f - 32) * 5 / 9
-    reading = f"{temp_f:.1f} degrees Fahrenheit ({temp_c:.1f} Celsius)"
+    reading = f"{temp_f:.1f} degrees"
     if age_weeks < 12 and temp_f >= 100.4:
         ref = REFERENCES["fever_under_3_months"]
         return TemperatureTriage(
             "call_now",
-            f"{reading} is a fever for a baby under 3 months. The American Academy of Pediatrics says to call your pediatrician now, even in the middle of the night.",
+            f"{reading} is a fever for a baby under 3 months. The American Academy of Pediatrics says to call your pediatrician now, even at night.",
             ref,
         )
     if temp_f > 104:

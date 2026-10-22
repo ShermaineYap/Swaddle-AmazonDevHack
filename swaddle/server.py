@@ -27,7 +27,7 @@ WEB = ROOT.parent / "web"
 TZ = os.environ.get("SWADDLE_TZ", "America/Los_Angeles")
 DEMO = os.environ.get("SWADDLE_DEMO", "1") == "1"
 
-clock = Clock(os.environ.get("SWADDLE_DEMO_TIME"), TZ)
+clock = Clock(os.environ.get("SWADDLE_DEMO_TIME"), TZ, frozen=os.environ.get("SWADDLE_FROZEN", "0") == "1")
 store = Store(os.environ.get("SWADDLE_DB", str(ROOT.parent / "data" / "swaddle.db")), clock)
 
 INSTRUCTIONS = """Swaddle keeps a shared care log for a newborn and answers questions about it.
@@ -159,14 +159,6 @@ def _next_feed_sentence(baby: Baby) -> tuple[str, dict[str, Any] | None]:
     return f" {baby.pronoun.capitalize()}'ll likely be hungry again around {I.fmt_clock(p.eta_ts, baby)}.", p.to_dict(baby)
 
 
-def _feeds_since_midnight(baby: Baby) -> int:
-    from .store import local
-
-    now = clock.now()
-    midnight = local(now, baby).replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
-    return len(store.events(baby, ["feed"], since_ts=midnight, until_ts=now))
-
-
 def _supports_elicitation(ctx: Context) -> bool:
     caps = ctx.client_capabilities
     return bool(caps and getattr(caps, "elicitation", None) is not None)
@@ -221,8 +213,6 @@ async def log_feed(
         speech += f" Next time, start on the {'right' if side == 'left' else 'left'}."
     if method == "bottle" and amount is None:
         speech = f"Logged a bottle at {I.fmt_clock(end, b)}. How much did {b.pronoun} drink?" if not asked else f"Logged a bottle at {I.fmt_clock(end, b)} without an amount."
-    n = _feeds_since_midnight(b)
-    speech += f" That's feed {n} since midnight."
     nf, nf_d = _next_feed_sentence(b)
     speech += nf
     return _result(Logged(speech=speech, event_id=e.id, kind="feed", at=I.fmt_clock(end, b), baby=b.name, caregiver=caregiver, details=data, next_feed=nf_d))
@@ -290,9 +280,9 @@ def start_sleep(
     else:
         e = store.add_event(b, "sleep", at, None, {}, caregiver)
     p = I.predict_next_sleep(store, b)
-    speech = f"Got it, {b.name} fell asleep at {I.fmt_clock(at, b)}."
+    speech = f"Got it, asleep at {I.fmt_clock(at, b)}."
     if p:
-        speech += f" Sleeps that start around now usually last about {I.fmt_minutes(p.typical_minutes)}, so maybe until {I.fmt_clock(p.eta_ts, b)}."
+        speech += f" {b.poss.capitalize()} sleeps around now usually last {I.fmt_minutes(p.typical_minutes)}, so until about {I.fmt_clock(p.eta_ts, b)}."
     return _result(Logged(speech=speech, event_id=e.id, kind="sleep", at=I.fmt_clock(at, b), baby=b.name, caregiver=caregiver, next_feed=p.to_dict(b) if p else None))
 
 
@@ -349,7 +339,7 @@ def log_temperature(
     ref = Ref(statement=tri.reference.statement, source=tri.reference.source, url=tri.reference.url) if tri.reference else None
     speech = tri.speech
     if tri.level == "call_now":
-        speech += " I've flagged it in the log so whoever calls has the details."
+        speech += " I've flagged it for the handoff."
     return _result(TemperatureLogged(speech=speech, event_id=e.id, kind="temperature", at=I.fmt_clock(now, b), baby=b.name, caregiver=caregiver, details={"temp_f": temp_f, "method": method}, level=tri.level, reference=ref))
 
 
@@ -420,14 +410,14 @@ def predict_next(baby: str | None = None) -> Annotated[CallToolResult, Predictio
     if feed:
         period = "nighttime" if "nighttime" in feed.basis else "daytime"
         parts.append(
-            f"{b.poss.capitalize()} {period} feeds this past week came about every {I.fmt_minutes(feed.typical_minutes)}, "
-            f"so expect {b.obj} hungry around {I.fmt_clock(feed.eta_ts, b)}, most likely between {I.fmt_clock(feed.low_ts, b)} and {I.fmt_clock(feed.high_ts, b)}."
+            f"{b.poss.capitalize()} {'night' if period == 'nighttime' else 'daytime'} feeds this week came about every {I.fmt_minutes(feed.typical_minutes)}, "
+            f"so expect {b.obj} hungry around {I.fmt_clock(feed.eta_ts, b)}, likely between {I.fmt_clock(feed.low_ts, b)} and {I.fmt_clock(feed.high_ts, b)}."
         )
     if sleep:
         if sleep.what == "wake":
             parts.append(f"{b.pronoun.capitalize()} will probably wake around {I.fmt_clock(sleep.eta_ts, b)}.")
         else:
-            parts.append(f"Next sleep window: about {I.fmt_clock(sleep.low_ts, b)} to {I.fmt_clock(sleep.high_ts, b)}.")
+            parts.append(f"Next nap window opens around {I.fmt_clock(sleep.low_ts, b)}.")
     if not parts:
         parts.append(f"I need a few more logged feeds and naps before I can predict {b.poss} rhythm.")
     return _result(Predictions(speech=" ".join(parts), baby=b.name, next_feed=feed.to_dict(b) if feed else None, next_sleep_or_wake=sleep.to_dict(b) if sleep else None, asleep=asleep))
@@ -484,7 +474,8 @@ def care_report(
     if fl:
         speech += f" {len(fl)} item{'s' if len(fl) != 1 else ''} flagged."
     if client_supports_apps(ctx):
-        speech += " It's on your screen."
+        # On a screen the visuals carry the detail; keep the spoken part to one line.
+        speech = f"Here's {b.name}'s past {days} days." + (f" {len(fl)} item{'s' if len(fl) != 1 else ''} flagged for the pediatrician." if fl else " Nothing flagged.")
     pf, ps = I.predict_next_feed(store, b), I.predict_next_sleep(store, b)
     refs = [Ref(statement=r.statement, source=r.source, url=r.url) for r in REFERENCES.values()]
     rep = Report(

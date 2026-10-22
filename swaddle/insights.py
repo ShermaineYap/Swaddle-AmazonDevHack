@@ -274,6 +274,7 @@ class Flag:
     speech: str
     reference: dict[str, str] | None = None
     at: str | None = None
+    short: str | None = None
 
 
 def _ref(r: Reference | None) -> dict[str, str] | None:
@@ -297,7 +298,11 @@ def flags(store: Store, baby: Baby, now_ts: float | None = None, window_h: float
     for e in store.events(baby, ["temperature"], since_ts=now_ts - window_h * 3600, until_ts=now_ts):
         tri = triage_temperature(float(e.data["temp_f"]), baby.age_weeks(e.start_ts))
         if tri.level != "ok":
-            out.append(Flag(tri.level, f"A {e.data['temp_f']:.1f} degree temperature at {fmt_clock(e.start_ts, baby)}. " + tri.speech.split(". ", 1)[-1], _ref(tri.reference), fmt_clock(e.start_ts, baby)))
+            when = fmt_clock(e.start_ts, baby)
+            short = f"a {e.data['temp_f']:.1f} degree temperature at {when}"
+            if tri.level == "call_now" and baby.age_weeks(e.start_ts) < 12:
+                short += ", which for a baby under 3 months means call the pediatrician"
+            out.append(Flag(tri.level, f"A {e.data['temp_f']:.1f} degree temperature at {when}. " + tri.speech.split(". ", 1)[-1], _ref(tri.reference), when, short))
 
     if covered and age_days >= 5 and t.wet < 6:
         out.append(
@@ -388,43 +393,32 @@ def handoff(store: Store, baby: Baby, since_ts: float, now_ts: float | None = No
     open_sleep = store.open_sleep(baby)
     fl = flags(store, baby, now_ts)
 
-    pieces = [f"Since {fmt_clock(since_ts, baby)}:"]
-    feed_bits = []
-    if t.breast_minutes:
-        feed_bits.append(f"{fmt_minutes(t.breast_minutes)} nursing")
-    if t.bottle_oz:
-        feed_bits.append(f"{t.bottle_oz:g} ounces by bottle")
-    pieces.append(f"{t.feeds} feed{'s' if t.feeds != 1 else ''}" + (f" ({', '.join(feed_bits)})" if feed_bits else "") + ",")
+    notes = [e for e in events if e.kind == "note" and e.start_ts >= since_ts]
+    serious = [f for f in fl if f.level == "call_now"]
+    watch = [f for f in fl if f.level == "watch"]
     n_diapers = len([e for e in events if e.kind == "diaper" and e.start_ts >= since_ts])
-    pieces.append(f"{n_diapers} diaper{'s' if n_diapers != 1 else ''}, {t.dirty} dirty,")
-    pieces.append(f"and {fmt_minutes(t.sleep_minutes)} of sleep, longest stretch {fmt_minutes(t.longest_sleep_minutes)}.")
-    speech = " ".join(pieces)
-    if len(by) > 1:
-        speech += " " + " ".join(
-            f"{who} did {v.get('feed', 0)} feed{'s' if v.get('feed', 0) != 1 else ''} and {v.get('diaper', 0)} diaper{'s' if v.get('diaper', 0) != 1 else ''}." for who, v in by.items() if who != "someone"
-        )
+
+    # Voice-first ordering: what needs action, then what someone said, then the numbers.
+    speech = f"Here's {baby.poss} night since {fmt_clock(since_ts, baby)}." if local(since_ts, baby).hour >= 18 or local(since_ts, baby).hour < 4 else f"Since {fmt_clock(since_ts, baby)}:"
+    if serious:
+        speech += " Important: " + (serious[0].short or serious[0].speech).rstrip(".") + "."
+    for n in notes:
+        speech += f" {n.caregiver or 'Someone'} left a note: {n.data.get('text', '').rstrip('.')}."
+    lead = " Otherwise:" if (serious or notes) else ""
+    speech += f"{lead} {t.feeds} feed{'s' if t.feeds != 1 else ''}, {n_diapers} diaper{'s' if n_diapers != 1 else ''}, and {fmt_minutes(t.sleep_minutes)} of sleep."
+    if watch and not serious:
+        speech += " One thing to watch: " + watch[0].speech
+    open_sleep = store.open_sleep(baby)
     if open_sleep:
-        speech += f" {baby.name} has been asleep since {fmt_clock(open_sleep.start_ts, baby)}."
+        speech += f" {baby.name}'s been asleep since {fmt_clock(open_sleep.start_ts, baby)}."
         sleep_state = f"asleep since {fmt_clock(open_sleep.start_ts, baby)}"
     else:
         last_sleep = store.last(baby, "sleep")
         sleep_state = f"awake since {fmt_clock(last_sleep.end_ts, baby)}" if last_sleep and last_sleep.end_ts else "awake"
-    if last_feed:
-        ago = (now_ts - last_feed.start_ts) / 60
-        speech += f" Last feed was {fmt_minutes(ago)} ago."
     if pred:
-        speech += f" Next one likely around {fmt_clock(pred.eta_ts, baby)}."
-    notes = [e for e in events if e.kind == "note" and e.start_ts >= since_ts]
-    serious = [f for f in fl if f.level == "call_now"]
-    watch = [f for f in fl if f.level == "watch"]
-    if serious:
-        speech += " Important: " + serious[0].speech
-    elif watch:
-        speech += " One thing to watch: " + watch[0].speech
-    else:
+        speech += f" Next feed likely around {fmt_clock(pred.eta_ts, baby)}."
+    if not (serious or watch):
         speech += " Nothing flagged."
-    for n in notes:
-        speech += f" {n.caregiver or 'Someone'} left a note at {fmt_clock(n.start_ts, baby)}: {n.data.get('text', '').rstrip('.')}."
     return Handoff(
         since=fmt_clock(since_ts, baby),
         hours=round((now_ts - since_ts) / 3600, 1),

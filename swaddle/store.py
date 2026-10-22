@@ -46,19 +46,29 @@ class Clock:
     This is how the demo video is shot at "3:12 AM" without waiting for 3 AM.
     """
 
-    def __init__(self, demo_time: str | None = None, tz: str = "UTC"):
+    def __init__(self, demo_time: str | None = None, tz: str = "UTC", frozen: bool = False):
         self._offset = 0.0
+        self._frozen_at: float | None = None
         if demo_time:
             anchor = datetime.fromisoformat(demo_time)
             if anchor.tzinfo is None:
                 anchor = anchor.replace(tzinfo=ZoneInfo(tz))
             self._offset = anchor.timestamp() - time.time()
+            if frozen:
+                self._frozen_at = anchor.timestamp()
 
     def now(self) -> float:
+        if self._frozen_at is not None:
+            return self._frozen_at + self._offset_frozen
         return time.time() + self._offset
 
+    _offset_frozen = 0.0
+
     def shift(self, seconds: float) -> None:
-        self._offset += seconds
+        if self._frozen_at is not None:
+            self._offset_frozen += seconds
+        else:
+            self._offset += seconds
 
 
 @dataclass

@@ -269,7 +269,7 @@ const ui = {
       this.pendingElicit = (text) => {
         $('ask').classList.remove('on'); this.pendingElicit = null;
         const amount = num(text.toLowerCase());
-        $('utter').textContent = `“${text}”`;
+        $('utter').textContent = `“${text}”`; currentUtter = text;
         resolve(amount ? { amount, unit: /ml|milli/.test(text.toLowerCase()) ? 'ml' : 'oz' } : null);
       };
     });
@@ -296,7 +296,7 @@ async function handle(text) {
     if (sc.level === 'call_now') badge = { level: 'call_now', text: '⚠ Call your pediatrician · ' + (sc.reference ? sc.reference.source : '') };
     else if (sc.level === 'ok') badge = { level: 'ok', text: 'Normal range' };
     else if (sc.next_feed && sc.next_feed.eta) badge = { level: 'info', text: `Next feed ~${sc.next_feed.eta} · ${sc.next_feed.confidence} confidence · learned from ${sc.next_feed.observations} intervals` };
-    ui.show(text, speech, badge);
+    ui.show(currentUtter, speech, badge);
     const tool = mcp.tools[name];
     const uri = tool && tool._meta && tool._meta.ui && tool._meta.ui.resourceUri;
     if (uri) await openApp(uri, res);
@@ -349,7 +349,19 @@ async function tickClock() {
 setInterval(tickClock, 5000);
 
 // Hook for scripted demos (used to record the submission video).
-window.swaddle = { handle, mcp, advanceClock: async (minutes) => { await fetch('demo/clock', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ minutes }) }); await tickClock(); } };
+function showUtterance(text, speaker) {
+  if (speaker) $('speaker').value = speaker;
+  $('appframe').classList.remove('on'); $('closeapp').classList.remove('on');
+  $('who').textContent = $('speaker').value + ' is speaking';
+  $('utter').textContent = `“${text}”`; $('reply').textContent = ''; $('badge').hidden = true;
+  $('listen').classList.add('on');
+}
+function caption(text) {
+  let c = document.getElementById('cap');
+  if (!c) { c = document.createElement('div'); c.id = 'cap'; c.style.cssText = 'position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);background:rgba(15,12,11,.92);border:1px solid #3a2f29;border-radius:20px;padding:26px 44px;font-size:44px;font-weight:650;z-index:99;letter-spacing:-.01em'; document.body.appendChild(c); }
+  c.textContent = text; c.style.display = text ? 'block' : 'none';
+}
+window.swaddle = { handle, mcp, showUtterance, caption, setSpeaker: (s) => { $('speaker').value = s; }, advanceClock: async (minutes) => { await fetch('demo/clock', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ minutes }) }); await tickClock(); } };
 
 mcp.connect().then(tickClock).catch((e) => { $('meta').textContent = 'Could not connect to ' + MCP_URL + ': ' + e.message; });
 </script>
