@@ -1,0 +1,357 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Swaddle · Simulated Alexa+ add-on</title>
+<style>
+  :root {
+    --bg: #0f0c0b; --frame: #1b1513; --screen: #14100e; --panel: #1f1916; --line: #3a2f29;
+    --ink: #f4e9df; --muted: #a8968a; --accent: #f0a35e; --user: #6f7fd8; --ok: #7bc47f; --alert: #ff6b5b; --warn: #f2c14e;
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font: 16px/1.45 "Inter", system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .app { display: grid; grid-template-columns: minmax(0, 1fr) 560px; grid-template-rows: auto minmax(0, 1fr); height: 100vh; gap: 18px; padding: 18px 22px 22px; }
+  .top { grid-column: 1 / -1; display: flex; align-items: center; gap: 16px; }
+  .brand { font-weight: 700; font-size: 22px; letter-spacing: -0.01em; }
+  .brand span { color: var(--accent); }
+  .tag { font-size: 13px; color: var(--muted); border: 1px solid var(--line); border-radius: 99px; padding: 3px 10px; }
+  .clock { margin-left: auto; font-size: 20px; font-variant-numeric: tabular-nums; color: var(--muted); }
+  .clock b { color: var(--ink); font-weight: 600; }
+
+  .device { display: grid; grid-template-rows: minmax(0, 1fr) auto; gap: 14px; min-height: 0; }
+  .screen { position: relative; background: var(--frame); border-radius: 28px; padding: 14px; box-shadow: 0 30px 80px rgba(0,0,0,.5), inset 0 0 0 1px #2c2320; min-height: 0; }
+  .glass { position: relative; height: 100%; background: var(--screen); border-radius: 18px; overflow: hidden; }
+  .home { position: absolute; inset: 0; padding: 44px 56px; display: flex; flex-direction: column; gap: 18px; }
+  .who { font-size: 18px; color: var(--muted); display: flex; gap: 10px; align-items: center; }
+  .who .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--user); }
+  .utter { font-size: 30px; color: #c9c3f0; font-style: italic; min-height: 44px; }
+  .reply { font-size: 38px; line-height: 1.32; font-weight: 500; letter-spacing: -0.01em; max-width: 30ch; }
+  .reply.alert { color: #ffb4aa; }
+  .reply .hl { color: var(--accent); }
+  .badge { align-self: flex-start; font-size: 15px; padding: 6px 12px; border-radius: 10px; border: 1px solid var(--line); color: var(--muted); }
+  .badge.call_now { color: #fff; background: #7a2219; border-color: #a33a2e; }
+  .badge.ok { color: var(--ok); }
+  .listen { position: absolute; left: 0; right: 0; bottom: 0; height: 6px; background: linear-gradient(90deg, transparent, var(--accent), transparent); opacity: 0; transition: opacity .2s; }
+  .listen.on { opacity: 1; animation: pulse 1.2s infinite; }
+  @keyframes pulse { 50% { opacity: .35; } }
+  .appframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: var(--screen); display: none; }
+  .appframe.on { display: block; }
+  .closeapp { position: absolute; right: 14px; top: 12px; z-index: 3; display: none; background: #2a211c; color: var(--muted); border: 1px solid var(--line); border-radius: 10px; padding: 4px 10px; cursor: pointer; }
+  .closeapp.on { display: block; }
+  .ask { position: absolute; left: 56px; right: 56px; bottom: 36px; background: #2a211c; border: 1px solid var(--accent); border-radius: 16px; padding: 16px 18px; display: none; }
+  .ask.on { display: block; }
+  .ask .q { font-size: 20px; margin-bottom: 8px; }
+  .ask .src { font-size: 13px; color: var(--muted); font-family: var(--mono); }
+
+  .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .controls select, .controls input, .controls button { font: inherit; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; }
+  .controls input { flex: 1; min-width: 220px; }
+  .controls button { cursor: pointer; }
+  .controls button.mic { width: 48px; padding: 10px 0; }
+  .controls button.mic.on { background: var(--accent); color: #1b1310; }
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; }
+  .chips button { font-size: 13px; padding: 6px 10px; border-radius: 99px; background: transparent; color: var(--muted); border: 1px solid var(--line); cursor: pointer; }
+
+  .inspector { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; display: grid; grid-template-rows: auto auto minmax(0, 1fr); min-height: 0; overflow: hidden; }
+  .inspector h2 { margin: 0; padding: 14px 16px 6px; font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; }
+  .meta { padding: 0 16px 10px; font: 12px/1.6 var(--mono); color: var(--muted); border-bottom: 1px solid var(--line); }
+  .meta b { color: var(--ink); font-weight: 500; }
+  .log { overflow: auto; padding: 10px 12px 14px; font: 12.5px/1.5 var(--mono); }
+  .ln { padding: 6px 8px; border-radius: 8px; margin-bottom: 6px; background: #19140f; border-left: 3px solid var(--line); white-space: pre-wrap; word-break: break-word; }
+  .ln.out { border-color: var(--user); }
+  .ln.in { border-color: var(--ok); }
+  .ln.srv { border-color: var(--accent); background: #261c14; }
+  .ln .h { color: var(--muted); }
+  .ln .m { color: var(--ink); font-weight: 600; }
+  .ln.new { animation: flash 1s; }
+  @keyframes flash { from { background: #3a2b1e; } }
+  .foot { font-size: 12px; color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="top">
+    <div class="brand">Swaddle<span>.</span></div>
+    <div class="tag">Simulated Alexa+ add-on · MCP over Streamable HTTP</div>
+    <div class="clock" id="clock"></div>
+  </div>
+
+  <div class="device">
+    <div class="screen"><div class="glass">
+      <div class="home" id="home">
+        <div class="who"><span class="dot"></span><span id="who">Say something to get started</span></div>
+        <div class="utter" id="utter"></div>
+        <div class="reply" id="reply">Hands full? Just talk. "She finished feeding on the left, about fifteen minutes."</div>
+        <div class="badge" id="badge" hidden></div>
+      </div>
+      <iframe class="appframe" id="appframe" sandbox="allow-scripts" title="MCP App"></iframe>
+      <button class="closeapp" id="closeapp">Close</button>
+      <div class="ask" id="ask"><div class="q" id="askq"></div><div class="src">elicitation/create · answer by voice or type below</div></div>
+      <div class="listen" id="listen"></div>
+    </div></div>
+    <div>
+      <div class="controls">
+        <select id="speaker" title="Who is speaking (Alexa+ voice ID)"><option>Sam</option><option>Priya</option></select>
+        <button class="mic" id="mic" title="Talk">🎙</button>
+        <input id="text" placeholder="Type what you'd say to Alexa…" autocomplete="off">
+        <button id="send">Send</button>
+        <label class="foot"><input type="checkbox" id="speak" checked> speak replies</label>
+      </div>
+      <div class="chips" id="chips" style="margin-top:10px"></div>
+    </div>
+  </div>
+
+  <div class="inspector">
+    <h2>Under the hood · live MCP traffic</h2>
+    <div class="meta" id="meta">connecting…</div>
+    <div class="log" id="log"></div>
+  </div>
+</div>
+
+<script>
+// --------------------------------------------------------------------------
+// Minimal MCP client (protocol 2025-11-25, Streamable HTTP) — no SDK, so every
+// message the judges see in the panel is exactly what goes over the wire.
+// --------------------------------------------------------------------------
+const MCP_URL = new URL('mcp', location.href.replace(/[^/]*$/, '')).toString();
+const PROTOCOL = '2025-11-25';
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+const mcp = {
+  sessionId: null, nextId: 1, tools: {}, serverInfo: null, protocol: null,
+  async post(body, { log = true } = {}) {
+    const headers = { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream' };
+    if (this.sessionId) headers['Mcp-Session-Id'] = this.sessionId;
+    if (this.protocol) headers['MCP-Protocol-Version'] = this.protocol;
+    if (log) logLine('out', body);
+    const res = await fetch(MCP_URL, { method: 'POST', headers, body: JSON.stringify(body) });
+    const sid = res.headers.get('Mcp-Session-Id');
+    if (sid) this.sessionId = sid;
+    return res;
+  },
+  async request(method, params) {
+    const id = this.nextId++;
+    const res = await this.post({ jsonrpc: '2.0', id, method, params });
+    const ct = res.headers.get('Content-Type') || '';
+    if (ct.includes('text/event-stream')) return this.readStream(res, id);
+    if (res.status === 202) return null;
+    const msg = await res.json();
+    logLine('in', msg);
+    if (msg.error) throw new Error(msg.error.message);
+    return msg.result;
+  },
+  notify(method, params = {}) { return this.post({ jsonrpc: '2.0', method, params }); },
+  async readStream(res, id) {
+    // Server may interleave its own requests (elicitation/create) before the final response.
+    const reader = res.body.getReader(); const dec = new TextDecoder(); let buf = '';
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      let i;
+      while ((i = buf.search(/\r?\n\r?\n/)) >= 0) {
+        const raw = buf.slice(0, i); buf = buf.slice(i).replace(/^\r?\n\r?\n/, '');
+        const data = raw.split(/\r?\n/).filter((l) => l.startsWith('data:')).map((l) => l.slice(5).trim()).join('\n');
+        if (!data) continue;
+        const msg = JSON.parse(data);
+        if (msg.method && msg.id !== undefined) { logLine('srv', msg); this.onServerRequest(msg); continue; }
+        if (msg.method) { logLine('in', msg); continue; }
+        if (msg.id === id) { logLine('in', msg); reader.cancel().catch(() => {}); if (msg.error) throw new Error(msg.error.message); return msg.result; }
+      }
+    }
+    return null;
+  },
+  async onServerRequest(msg) {
+    if (msg.method === 'elicitation/create') {
+      const content = await ui.elicit(msg.params);
+      const result = content ? { action: 'accept', content } : { action: 'decline' };
+      await this.post({ jsonrpc: '2.0', id: msg.id, result });
+    } else {
+      await this.post({ jsonrpc: '2.0', id: msg.id, error: { code: -32601, message: 'Method not found' } });
+    }
+  },
+  async connect() {
+    const init = await this.request('initialize', {
+      protocolVersion: PROTOCOL,
+      capabilities: { elicitation: { form: {} }, extensions: { 'io.modelcontextprotocol/ui': { mimeTypes: ['text/html;profile=mcp-app'] } } },
+      clientInfo: { name: 'swaddle-simulated-alexa-plus', title: 'Simulated Alexa+ add-on', version: '1.0.0' },
+    });
+    this.protocol = init.protocolVersion; this.serverInfo = init.serverInfo;
+    await this.notify('notifications/initialized');
+    const list = await this.request('tools/list', {});
+    for (const t of list.tools) this.tools[t.name] = t;
+    renderMeta();
+  },
+  call(name, args) { return this.request('tools/call', { name, arguments: args }); },
+  async readResource(uri) { const r = await this.request('resources/read', { uri }); return r.contents[0]; },
+};
+
+function short(obj) {
+  // Keep the panel readable: collapse big payloads.
+  const s = JSON.stringify(obj, (k, v) => {
+    if (k === 'tools' && Array.isArray(v)) return `[${v.length} tools: ${v.map((t) => t.name).join(', ')}]`;
+    if (k === 'structuredContent' && v && typeof v === 'object') { const ks = Object.keys(v); return `{${ks.slice(0, 6).join(', ')}${ks.length > 6 ? ', …' : ''}}`; }
+    if (k === 'text' && typeof v === 'string' && v.length > 600) return v.slice(0, 120) + '… (' + v.length + ' chars)';
+    if (k === 'capabilities' && v && typeof v === 'object') return Object.keys(v).join(', ');
+    return v;
+  });
+  return s.length > 520 ? s.slice(0, 520) + '…' : s;
+}
+function logLine(dir, msg) {
+  const label = dir === 'out' ? 'client → server' : dir === 'srv' ? 'server → client (request)' : 'server → client';
+  const what = msg.method ? msg.method + (msg.params && msg.params.name ? ' · ' + msg.params.name : '') : (msg.error ? 'error' : 'result');
+  const el = document.createElement('div');
+  el.className = 'ln new ' + dir;
+  el.innerHTML = `<div><span class="h">${label}</span> <span class="m">${esc(what)}</span></div>${esc(short(msg.params || msg.result || msg.error || {}))}`;
+  $('log').appendChild(el); $('log').scrollTop = $('log').scrollHeight;
+  setTimeout(() => el.classList.remove('new'), 1000);
+}
+function renderMeta() {
+  $('meta').innerHTML = `endpoint <b>${esc(MCP_URL)}</b><br>protocol <b>${esc(mcp.protocol)}</b> · server <b>${esc(mcp.serverInfo.name)} ${esc(mcp.serverInfo.version)}</b><br>session <b>${esc((mcp.sessionId || '').slice(0, 18))}…</b> · <b>${Object.keys(mcp.tools).length}</b> tools · elicitation ✓ · MCP Apps ✓`;
+}
+
+// --------------------------------------------------------------------------
+// Utterance → tool. In production Alexa+'s LLM chooses tools from the
+// descriptions returned by tools/list; this tiny rule-based router stands in for
+// it so the simulator runs offline with no API keys.
+// --------------------------------------------------------------------------
+const NUM = { a: 1, an: 1, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12, fifteen: 15, twenty: 20, thirty: 30, forty: 40, fifty: 50, sixty: 60, ninety: 90, half: 0.5 };
+function num(s) {
+  s = s.replace(/twenty[- ]five/g, '25').replace(/forty[- ]five/g, '45').replace(/(\w+) and a half/g, (m, a) => String((NUM[a] || +a) + 0.5));
+  const m = s.match(/(\d+(?:\.\d+)?)/); if (m) return parseFloat(m[1]);
+  for (const w of s.split(/\W+/)) if (w in NUM && w !== 'a' && w !== 'an') return NUM[w];
+  return null;
+}
+function minutesAgo(t) { const m = t.match(/(\w+(?:[- ]\w+)?) (minutes?|mins?|hours?) ago/); if (!m) return 0; const n = num(m[1]) || 0; return /hour/.test(m[2]) ? n * 60 : n; }
+function route(raw) {
+  const t = raw.toLowerCase().replace(/^(alexa|hey alexa)[, ]*/, '');
+  const ago = minutesAgo(t);
+  if (/\b(undo|scratch that|that was wrong|delete that)\b/.test(t)) return ['undo_last', {}];
+  const note = raw.match(/^(?:alexa[, ]*)?(?:leave a note|note|tell (?:priya|sam|them))[:,]?\s*(?:that\s+)?(.+)$/i);
+  if (note) return ['add_note', { text: note[1] }];
+  if (/(catch me up|how was the night|what did i miss|handoff|hand off|overnight)/.test(t)) return ['shift_handoff', { since_hours: /night|overnight/.test(t) ? 9 : 8 }];
+  if (/(report|her week|his week|the week|pediatrician|doctor|checkup|show me)/.test(t)) return ['care_report', { days: 7 }];
+  if (/(temp|temperature|fever|degrees)/.test(t) && num(t)) { const v = num(t.replace(/\d+\s*(minutes?|hours?) ago/, '')); return ['log_temperature', { value: v, unit: v < 45 || /celsius|°c/.test(t) ? 'C' : 'F', method: /rectal|bottom/.test(t) ? 'rectal' : /armpit/.test(t) ? 'armpit' : /forehead/.test(t) ? 'forehead' : /ear/.test(t) ? 'ear' : 'unknown' }]; }
+  if (/(when|how long).*(eat|ate|fed|feed|nurse|side)|which side/.test(t)) return ['get_last', { kind: 'feed' }];
+  if (/(when|how long).*(poop|dirty)/.test(t)) return ['get_last', { kind: 'dirty_diaper' }];
+  if (/(when|how long).*(diaper|change)/.test(t)) return ['get_last', { kind: 'diaper' }];
+  if (/(how long).*(asleep|sleeping)|when did .* (wake|sleep)/.test(t)) return ['get_last', { kind: 'sleep' }];
+  if (/(when|what).*(hungry|next|nap|tired|sleep again)/.test(t)) return ['predict_next', {}];
+  if (/(diaper|poop|pee|wet|dirty|blowout)/.test(t) && !/feed|bottle/.test(t)) { const both = /(wet and dirty|both|poop and pee|pee and poop)/.test(t); return ['log_diaper', { type: both ? 'both' : /(poop|dirty|blowout)/.test(t) ? 'dirty' : 'wet', minutes_ago: ago }]; }
+  if (/bottle|formula/.test(t)) { const a = t.match(/(\d+(?:\.\d+)?|\w+(?: and a half)?)\s*(ounces?|oz|ml|milliliters?|mls)/); const args = { method: 'bottle', ended_minutes_ago: ago }; if (a) { args.amount = num(a[0]); args.unit = /ml|milli/.test(a[2]) ? 'ml' : 'oz'; } if (/formula/.test(t)) args.contents = 'formula'; return ['log_feed', args]; }
+  if (/(fed|feed|nurs|ate|eating|latch)/.test(t)) { const side = /left/.test(t) ? 'left' : /right/.test(t) ? 'right' : /both/.test(t) ? 'both' : undefined; const d = t.match(/(\w+(?:[- ]\w+)?)\s*(minutes?|mins?)(?! ago)/); const args = { method: 'breast', ended_minutes_ago: ago }; if (side) args.side = side; if (d) args.duration_minutes = num(d[1]); return ['log_feed', args]; }
+  if (/(fell asleep|is asleep|she's asleep|he's asleep|asleep|down for a nap|went down|sleeping now)/.test(t)) return ['start_sleep', { minutes_ago: ago }];
+  if (/(woke|awake|is up|she's up|he's up)/.test(t)) return ['end_sleep', { minutes_ago: ago }];
+  return null;
+}
+
+// --------------------------------------------------------------------------
+// Device UI
+// --------------------------------------------------------------------------
+const ui = {
+  pendingElicit: null,
+  show(utter, reply, badge) {
+    $('appframe').classList.remove('on'); $('closeapp').classList.remove('on');
+    $('who').textContent = $('speaker').value + ' said';
+    $('utter').textContent = utter ? `“${utter}”` : '';
+    $('reply').textContent = reply;
+    $('reply').classList.toggle('alert', badge && badge.level === 'call_now');
+    const b = $('badge');
+    if (badge) { b.hidden = false; b.className = 'badge ' + badge.level; b.textContent = badge.text; } else b.hidden = true;
+  },
+  elicit(params) {
+    return new Promise((resolve) => {
+      $('askq').textContent = params.message; $('ask').classList.add('on');
+      speak(params.message);
+      this.pendingElicit = (text) => {
+        $('ask').classList.remove('on'); this.pendingElicit = null;
+        const amount = num(text.toLowerCase());
+        $('utter').textContent = `“${text}”`;
+        resolve(amount ? { amount, unit: /ml|milli/.test(text.toLowerCase()) ? 'ml' : 'oz' } : null);
+      };
+    });
+  },
+};
+
+let currentUtter = '';
+async function handle(text) {
+  text = text.trim(); if (!text) return;
+  if (ui.pendingElicit) { ui.pendingElicit(text); return; }
+  currentUtter = text;
+  const caregiver = $('speaker').value;
+  const r = route(text);
+  if (!r) { ui.show(text, "I can log feeds, diapers, sleep and temperatures, or tell you what's next. Try one of the suggestions below."); return; }
+  const [name, args] = r;
+  if (['log_feed', 'log_diaper', 'start_sleep', 'end_sleep', 'log_temperature', 'add_note'].includes(name)) args.caregiver = caregiver;
+  ui.show(text, '…');
+  $('listen').classList.add('on');
+  try {
+    const res = await mcp.call(name, args);
+    const speech = (res.content || []).filter((c) => c.type === 'text').map((c) => c.text).join(' ');
+    const sc = res.structuredContent || {};
+    let badge = null;
+    if (sc.level === 'call_now') badge = { level: 'call_now', text: '⚠ Call your pediatrician · ' + (sc.reference ? sc.reference.source : '') };
+    else if (sc.level === 'ok') badge = { level: 'ok', text: 'Normal range' };
+    else if (sc.next_feed && sc.next_feed.eta) badge = { level: 'info', text: `Next feed ~${sc.next_feed.eta} · ${sc.next_feed.confidence} confidence · learned from ${sc.next_feed.observations} intervals` };
+    ui.show(text, speech, badge);
+    const tool = mcp.tools[name];
+    const uri = tool && tool._meta && tool._meta.ui && tool._meta.ui.resourceUri;
+    if (uri) await openApp(uri, res);
+    speak(speech);
+  } catch (e) {
+    ui.show(text, 'Sorry, something went wrong: ' + e.message);
+  } finally { $('listen').classList.remove('on'); }
+}
+
+// MCP Apps host side: fetch the ui:// resource, render it sandboxed, hand it the tool result.
+async function openApp(uri, result) {
+  const res = await mcp.readResource(uri);
+  const frame = $('appframe');
+  const onMsg = (ev) => {
+    if (ev.source !== frame.contentWindow) return;
+    const m = ev.data || {};
+    if (m.method === 'ui/initialize') frame.contentWindow.postMessage({ jsonrpc: '2.0', id: m.id, result: { protocolVersion: '2026-01-26', hostInfo: { name: 'swaddle-simulated-alexa-plus', version: '1.0.0' }, hostCapabilities: {}, hostContext: { theme: 'dark', displayMode: 'inline' } } }, '*');
+    if (m.method === 'ui/notifications/initialized') frame.contentWindow.postMessage({ jsonrpc: '2.0', method: 'ui/notifications/tool-result', params: result }, '*');
+  };
+  window.addEventListener('message', onMsg);
+  frame.srcdoc = res.text;
+  frame.classList.add('on'); $('closeapp').classList.add('on');
+}
+$('closeapp').onclick = () => { $('appframe').classList.remove('on'); $('closeapp').classList.remove('on'); };
+
+function speak(text) {
+  if (!$('speak').checked || !('speechSynthesis' in window)) return;
+  speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(text); u.rate = 1.02; speechSynthesis.speak(u);
+}
+
+// Voice input via the browser's Web Speech API, when available.
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+$('mic').onclick = () => {
+  if (!SR) { $('text').placeholder = 'Voice input needs Chrome — type instead'; return; }
+  const rec = new SR(); rec.lang = 'en-US'; rec.interimResults = false;
+  $('mic').classList.add('on'); $('listen').classList.add('on');
+  rec.onresult = (e) => { const t = e.results[0][0].transcript; $('text').value = ''; handle(t); };
+  rec.onend = () => { $('mic').classList.remove('on'); $('listen').classList.remove('on'); };
+  rec.start();
+};
+$('send').onclick = () => { const v = $('text').value; $('text').value = ''; handle(v); };
+$('text').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('send').onclick(); });
+
+const CHIPS = ['She finished feeding on the left, about fifteen minutes', 'Wet diaper', 'I gave her a bottle', 'When will she be hungry again?', 'Her temperature is 100.6', "She's asleep", 'Catch me up on the night', "Show me Mia's week", 'Undo that'];
+for (const c of CHIPS) { const b = document.createElement('button'); b.textContent = c; b.onclick = () => handle(c); $('chips').appendChild(b); }
+
+async function tickClock() {
+  try { const r = await (await fetch('demo/clock')).json(); $('clock').innerHTML = `household time <b>${esc(r.label)}</b>`; } catch (e) {}
+}
+setInterval(tickClock, 5000);
+
+// Hook for scripted demos (used to record the submission video).
+window.swaddle = { handle, mcp, advanceClock: async (minutes) => { await fetch('demo/clock', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ minutes }) }); await tickClock(); } };
+
+mcp.connect().then(tickClock).catch((e) => { $('meta').textContent = 'Could not connect to ' + MCP_URL + ': ' + e.message; });
+</script>
+</body>
+</html>

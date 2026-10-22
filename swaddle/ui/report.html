@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Swaddle care report</title>
+<style>
+  :root {
+    --bg: #14100e; --panel: #1f1916; --line: #3a2f29; --ink: #f4e9df; --muted: #b3a294;
+    --sleep: #6f7fd8; --feed: #f0a35e; --bottle: #f6c98a; --wet: #5cc4c0; --dirty: #b0875c;
+    --warn: #f2c14e; --alert: #ff6b5b; --ok: #7bc47f;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.4 "Inter", system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .wrap { padding: 20px 22px; display: grid; gap: 14px; grid-template-columns: 340px 1fr; grid-template-rows: auto 1fr; min-height: 100vh; }
+  header { grid-column: 1 / -1; display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+  header h1 { font-size: 26px; margin: 0; font-weight: 650; letter-spacing: -0.01em; }
+  header .sub { color: var(--muted); }
+  header .gen { margin-left: auto; color: var(--muted); font-size: 13px; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; }
+  .panel h2 { margin: 0 0 8px; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+  .left { display: grid; gap: 14px; align-content: start; }
+  .right { display: grid; gap: 14px; grid-template-columns: 1fr 1fr 1fr; align-content: start; }
+  .right .wide { grid-column: 1 / -1; }
+  .ring { display: block; margin: 0 auto; }
+  .legend { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+  .pred { display: grid; gap: 8px; }
+  .pred .row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .pred .big { font-size: 24px; font-weight: 650; }
+  .pred .range { color: var(--muted); font-size: 13px; }
+  .pred .basis { color: var(--muted); font-size: 12px; }
+  .chip { font-size: 11px; padding: 2px 8px; border-radius: 99px; border: 1px solid var(--line); color: var(--muted); }
+  .chart svg { width: 100%; height: 130px; display: block; }
+  .chart .val { font-size: 22px; font-weight: 650; }
+  .chart .note { font-size: 12px; color: var(--muted); }
+  .flags { display: grid; gap: 10px; }
+  .flag { border-left: 4px solid var(--warn); padding: 8px 12px; background: #2a211c; border-radius: 8px; }
+  .flag.call_now { border-color: var(--alert); background: #3a1d19; }
+  .flag .src { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .flag .src a { color: var(--muted); }
+  .none { color: var(--ok); }
+  .disc { grid-column: 1 / -1; font-size: 12px; color: var(--muted); }
+  @media (max-width: 860px) { .wrap { grid-template-columns: 1fr; } .right { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap" id="app">
+  <header><h1>Loading…</h1></header>
+</div>
+<script>
+(function () {
+  const C = getComputedStyle(document.documentElement);
+  const col = (n) => C.getPropertyValue('--' + n).trim();
+  const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const fmtH = (m) => { m = Math.round(m); const h = Math.floor(m / 60), r = m % 60; return h ? `${h}h ${String(r).padStart(2, '0')}m` : `${r}m`; };
+
+  function ring(d) {
+    // 24-hour clock face: sleep arcs on the outer track, feeds and diapers as marks inside.
+    const S = 300, cx = S / 2, cy = S / 2, R = 128, now = d.now, start = now - 24 * 3600;
+    const ang = (ts) => { const dt = new Date(ts * 1000); const h = (dt.getUTCHours() + dt.getUTCMinutes() / 60 + d.tzOffsetH + 48) % 24; return (h / 24) * 2 * Math.PI - Math.PI / 2; };
+    const pt = (a, r) => [cx + r * Math.cos(a), cy + r * Math.sin(a)];
+    const arc = (a0, a1, r) => { let da = a1 - a0; if (da < 0) da += 2 * Math.PI; const [x0, y0] = pt(a0, r), [x1, y1] = pt(a0 + da, r); return `M${x0},${y0} A${r},${r} 0 ${da > Math.PI ? 1 : 0} 1 ${x1},${y1}`; };
+    let g = `<circle cx="${cx}" cy="${cy}" r="${R}" fill="none" stroke="${col('line')}" stroke-width="18"/>`;
+    for (let h = 0; h < 24; h++) {
+      const a = (h / 24) * 2 * Math.PI - Math.PI / 2, [x0, y0] = pt(a, R - 14), [x1, y1] = pt(a, R - (h % 6 ? 18 : 24));
+      g += `<line x1="${x0}" y1="${y0}" x2="${x1}" y2="${y1}" stroke="${col('muted')}" stroke-width="${h % 6 ? 1 : 2}" opacity=".6"/>`;
+      if (h % 6 === 0) { const [tx, ty] = pt(a, R - 38); g += `<text x="${tx}" y="${ty + 4}" fill="${col('muted')}" font-size="12" text-anchor="middle">${h === 0 ? '12a' : h === 12 ? '12p' : h < 12 ? h + 'a' : (h - 12) + 'p'}</text>`; }
+    }
+    for (const e of d.timeline) {
+      if (e.kind === 'sleep') {
+        const s = Math.max(e.start, start), t = e.end || now;
+        g += `<path d="${arc(ang(s), ang(t), R)}" stroke="${col('sleep')}" stroke-width="18" fill="none" stroke-linecap="butt" opacity="${e.open ? .65 : 1}"/>`;
+      }
+    }
+    for (const e of d.timeline) {
+      if (e.kind === 'feed') { const [x, y] = pt(ang(e.start), R - 56); g += `<circle cx="${x}" cy="${y}" r="7" fill="${e.data.method === 'bottle' ? col('bottle') : col('feed')}"/>`; }
+      if (e.kind === 'diaper') { const [x, y] = pt(ang(e.start), R - 76); g += `<rect x="${x - 4}" y="${y - 4}" width="8" height="8" rx="2" fill="${e.data.type === 'wet' ? col('wet') : col('dirty')}"/>`; }
+      if (e.kind === 'temperature') { const [x, y] = pt(ang(e.start), R + 20); g += `<text x="${x}" y="${y + 5}" font-size="16" text-anchor="middle" fill="${e.data.level === 'call_now' ? col('alert') : col('warn')}">▲</text>`; }
+    }
+    const [hx, hy] = pt(ang(now), R + 4), [hx0, hy0] = pt(ang(now), 30);
+    g += `<line x1="${hx0}" y1="${hy0}" x2="${hx}" y2="${hy}" stroke="${col('ink')}" stroke-width="2"/><circle cx="${cx}" cy="${cy}" r="4" fill="${col('ink')}"/>`;
+    g += `<text x="${cx}" y="${cy + 26}" fill="${col('ink')}" font-size="14" text-anchor="middle">now ${esc(d.generated_at)}</text>`;
+    return `<svg class="ring" width="${S}" height="${S}" viewBox="0 0 ${S} ${S}" role="img" aria-label="24 hour timeline">${g}</svg>`;
+  }
+
+  function bars(days, key, color, opts = {}) {
+    const W = 300, H = 130, pad = 20, n = days.length, vals = days.map((x) => x[key] / (opts.div || 1));
+    const max = Math.max(opts.ref || 0, ...vals) * 1.15 || 1, bw = (W - pad) / n;
+    let g = '';
+    vals.forEach((v, i) => {
+      const h = (v / max) * (H - pad), x = pad + i * bw + 3, y = H - pad - h, last = i === n - 1;
+      g += `<rect x="${x}" y="${y}" width="${bw - 6}" height="${h}" rx="4" fill="${color}" opacity="${last ? .45 : 1}"/>`;
+      g += `<text x="${x + (bw - 6) / 2}" y="${H - 5}" font-size="10" text-anchor="middle" fill="${col('muted')}">${esc(days[i].label.split(' ')[0])}</text>`;
+    });
+    if (opts.ref) { const y = H - pad - (opts.ref / max) * (H - pad); g += `<line x1="${pad}" x2="${W}" y1="${y}" y2="${y}" stroke="${col('warn')}" stroke-dasharray="4 4"/><text x="${pad}" y="${y - 4}" font-size="10" fill="${col('warn')}">${esc(opts.refLabel)}</text>`; }
+    return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${g}</svg>`;
+  }
+
+  function render(d) {
+    const full = d.days.slice(0, -1).length ? d.days.slice(0, -1) : d.days;
+    const avg = (k) => full.reduce((s, x) => s + x[k], 0) / full.length;
+    const pf = d.predictions.feed, ps = d.predictions.sleep;
+    const flags = d.flags.length
+      ? d.flags.map((f) => `<div class="flag ${esc(f.level)}"><div>${esc(f.speech)}</div>${f.reference ? `<div class="src">${esc(f.reference.statement)} — <a href="${esc(f.reference.url)}" target="_blank" rel="noopener">${esc(f.reference.source)}</a></div>` : ''}</div>`).join('')
+      : `<div class="none">Nothing flagged. Feeds, diapers and sleep are within the usual range for ${esc(d.baby)}.</div>`;
+    document.getElementById('app').innerHTML = `
+      <header><h1>${esc(d.baby)}</h1><span class="sub">${Math.floor(d.age_weeks)} weeks · last ${d.days.length} days</span><span class="gen">Swaddle care report · ${esc(d.generated_at)}</span></header>
+      <div class="left">
+        <div class="panel"><h2>Last 24 hours</h2>${ring(d)}
+          <div class="legend"><span><i style="background:${col('sleep')}"></i>Sleep</span><span><i style="background:${col('feed')}"></i>Nursing</span><span><i style="background:${col('bottle')}"></i>Bottle</span><span><i style="background:${col('wet')}"></i>Wet</span><span><i style="background:${col('dirty')}"></i>Dirty</span></div></div>
+        <div class="panel pred"><h2>Coming up</h2>
+          ${pf ? `<div class="row"><span>Next feed</span><span class="chip">${esc(pf.confidence)} confidence</span></div><div class="big">~${esc(pf.eta)}</div><div class="range">likely ${esc(pf.low)} – ${esc(pf.high)}</div><div class="basis">${esc(pf.basis)} (${pf.observations} intervals)</div>` : '<div class="basis">Not enough data yet.</div>'}
+          ${ps ? `<div class="row" style="margin-top:6px"><span>${ps.what === 'wake' ? 'Likely wake' : 'Next sleep window'}</span></div><div class="big" style="font-size:20px">${esc(ps.low)} – ${esc(ps.high)}</div><div class="basis">${esc(ps.basis)}</div>` : ''}
+        </div>
+      </div>
+      <div class="right">
+        <div class="panel chart"><h2>Feeds / day</h2><div class="val">${avg('feeds').toFixed(1)}</div>${bars(d.days, 'feeds', col('feed'), { ref: 8, refLabel: '8 / day' })}<div class="note">AAP: 8–12 feeds a day for newborns</div></div>
+        <div class="panel chart"><h2>Wet diapers / day</h2><div class="val">${avg('wet').toFixed(1)}</div>${bars(d.days, 'wet', col('wet'), { ref: 6, refLabel: '6 / day' })}<div class="note">AAP: 6+ after the first week</div></div>
+        <div class="panel chart"><h2>Sleep / day</h2><div class="val">${fmtH(avg('sleep_minutes'))}</div>${bars(d.days, 'sleep_minutes', col('sleep'), { div: 60 })}<div class="note">Longest stretch this week: ${fmtH(Math.max(...d.days.map((x) => x.longest_sleep_minutes)))}</div></div>
+        <div class="panel wide"><h2>Flagged for the pediatrician</h2><div class="flags">${flags}</div></div>
+      </div>
+      <div class="disc">${esc(d.disclaimer)} Today's bar is shaded lighter because the day is not over.</div>`;
+  }
+
+  function accept(result) {
+    const d = result && (result.structuredContent || result.structured_content);
+    if (!d) return;
+    d.now = d.now_ts;
+    d.tzOffsetH = d.tz_offset_hours || 0;
+    render(d);
+  }
+
+  // MCP Apps (io.modelcontextprotocol/ui) app side: initialize with the host, then wait for the tool result.
+  let nextId = 1;
+  const send = (msg) => window.parent && window.parent.postMessage(msg, '*');
+  window.addEventListener('message', (ev) => {
+    const m = ev.data || {};
+    if (m.id === 1 && m.result) send({ jsonrpc: '2.0', method: 'ui/notifications/initialized', params: {} });
+    if (m.method === 'ui/notifications/tool-result') accept(m.params);
+  });
+  send({ jsonrpc: '2.0', id: nextId++, method: 'ui/initialize', params: { protocolVersion: '2026-01-26', appInfo: { name: 'swaddle-report', version: '1.0.0' }, appCapabilities: {} } });
+  if (window.__SWADDLE_RESULT__) accept(window.__SWADDLE_RESULT__);
+})();
+</script>
+</body>
+</html>

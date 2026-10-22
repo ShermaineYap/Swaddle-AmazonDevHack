@@ -1,0 +1,14 @@
+# One-click deploy on Render's free tier: New > Blueprint > point at this repo.
+services:
+  - type: web
+    name: swaddle
+    runtime: docker
+    plan: free
+    healthCheckPath: /healthz
+    envVars:
+      - key: SWADDLE_PUBLIC
+        value: "1"
+      - key: SWADDLE_DEMO_TIME
+        value: "2026-10-23T03:12"
+      - key: SWADDLE_SEED_END
+        value: "2026-10-23T02:57"
