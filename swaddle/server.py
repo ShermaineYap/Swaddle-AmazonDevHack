@@ -43,7 +43,7 @@ mcp_server = MCPServer(
     description="Log feeds, diapers, sleep and temperatures by voice; get predictions learned from your baby's own patterns; hand off shifts; share a pediatrician-ready report.",
     instructions=INSTRUCTIONS,
     version="1.0.0",
-    website_url="https://github.com/",
+    website_url="https://github.com/ShermaineYap/Swaddle-AmazonDevHack",
 )
 apps = Apps()
 

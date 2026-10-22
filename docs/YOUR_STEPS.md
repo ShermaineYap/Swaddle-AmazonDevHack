@@ -2,15 +2,8 @@
 
 Deadline: **Sat 24 Oct, 03:00 Malaysia time** (Oct 23, 12:00 PDT). Aim to submit Friday evening.
 
-## 1. Put the code on GitHub (10 min)
-1. Go to https://github.com/new. Name the repo `swaddle`, choose **Public**, and **don't** add a README or license (they're already in the code). Click Create.
-2. Open Terminal and run:
-   ```bash
-   cd "~/Documents/icloud doc/Hacks/Amazon Dev Hack/swaddle"
-   git remote add origin https://github.com/<YOUR-USERNAME>/swaddle.git
-   git push -u origin main
-   ```
-3. On the repo page, click the gear next to **About** and make sure the license shows **MIT**. GitHub detects it automatically from the LICENSE file.
+## 1. Code on GitHub: done
+Pushed to https://github.com/ShermaineYap/Swaddle-AmazonDevHack (public, MIT).
 
 ## 2. Upload the video (10 min)
 1. Go to https://studio.youtube.com, then Create → Upload, and pick `swaddle_demo.mp4`.
@@ -20,7 +13,7 @@ Deadline: **Sat 24 Oct, 03:00 Malaysia time** (Oct 23, 12:00 PDT). Aim to submit
 
 ## 3. Fill in the Devpost form (10 min)
 Open `docs/SUBMISSION.md` and copy each section into the matching field.
-- Replace `<GITHUB URL>`, `<YOUTUBE URL>` and `<YOUR GITHUB USERNAME>` everywhere, including the link at the top of `README.md`. Commit and push that README change too.
+- Replace `<YOUTUBE URL>` with your video link (the GitHub links are already filled in).
 - Track: **Alexa+**. Mini challenge: **Open Source**.
 - Paste the **Product feedback** blocks (required) and the **Friction log** (optional, worth up to a 10% bonus).
 - Add `docs/screenshot-report.png` and `docs/screenshot-fever.png` to the image gallery.

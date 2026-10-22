@@ -23,7 +23,7 @@ About 3.6 million babies were born in the US in 2024 ([CDC NCHS](https://www.cdc
 ## Quick start (about 1 minute)
 
 ```bash
-git clone <this repo> && cd swaddle
+git clone https://github.com/ShermaineYap/Swaddle-AmazonDevHack.git && cd Swaddle-AmazonDevHack
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 SWADDLE_DEMO_TIME=2026-10-23T03:12 SWADDLE_SEED_END=2026-10-23T02:57 python -m swaddle.server

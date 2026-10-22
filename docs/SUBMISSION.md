@@ -1,6 +1,6 @@
 # Devpost submission: copy and paste
 
-Fields are in the order the Devpost form asks for them. Replace `<GITHUB URL>` and `<YOUTUBE URL>` once those exist.
+Fields are in the order the Devpost form asks for them. Replace `<YOUTUBE URL>` (here and in README.md) once the video is uploaded.
 
 ---
 
@@ -69,7 +69,7 @@ Swaddle is a logging assistant, not medical advice. The demo household and histo
 python, mcp, model-context-protocol, streamable-http, mcp-apps, numpy, sqlite, starlette, uvicorn, javascript, html, css, playwright, kokoro-tts, ffmpeg
 
 ## Try it out links
-- `<GITHUB URL>`
+- `https://github.com/ShermaineYap/Swaddle-AmazonDevHack`
 - (optional) live deployment URL if you deploy with `render.yaml`
 
 ## Video demo link
@@ -82,9 +82,9 @@ No. Swaddle is a new project; all code was written during the submission window.
 
 ## Open Source mini challenge fields
 - **Contribution type:** New open-source project
-- **Project repository URL:** `<GITHUB URL>`
-- **Contribution URL:** `<GITHUB URL>`
-- **GitHub username:** `<YOUR GITHUB USERNAME>`
+- **Project repository URL:** `https://github.com/ShermaineYap/Swaddle-AmazonDevHack`
+- **Contribution URL:** `https://github.com/ShermaineYap/Swaddle-AmazonDevHack`
+- **GitHub username:** `ShermaineYap`
 - **What / how / why:** Swaddle is a new MIT-licensed MCP server and an SDK-free reference MCP client. The client shows exactly what an Alexa+-style host sends over Streamable HTTP (2025-11-25), including elicitation over SSE and hosting an MCP App. I open-sourced it so other Alexa+ builders without Toolkit access can test their servers the way a host would use them, and so parents and developers can build on the care engine.
 
 ---
