@@ -1,6 +1,6 @@
 # Devpost submission: copy and paste
 
-Fields are in the order the Devpost form asks for them. Replace `<YOUTUBE URL>` (here and in README.md) once the video is uploaded.
+Fields are in the order the Devpost form asks for them. All links are filled in.
 
 ---
 
@@ -73,7 +73,7 @@ python, mcp, model-context-protocol, streamable-http, mcp-apps, numpy, sqlite, s
 - (optional) live deployment URL if you deploy with `render.yaml`
 
 ## Video demo link
-`<YOUTUBE URL>` (public, 2:51, English)
+https://youtu.be/TPDbhNsB-cg (public, 2:51, English)
 
 ## Pre-existing project?
 No. Swaddle is a new project; all code was written during the submission window.

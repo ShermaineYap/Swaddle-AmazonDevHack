@@ -12,7 +12,7 @@ Swaddle is a baby-care service an Alexa+ household can talk to:
 - **Shift handoff:** "catch me up on the night" leads with what needs action (a flagged fever, a note from the nurse line), then the numbers.
 - **On a screen:** the same tool renders an **MCP App**: a 24-hour clock of sleep, feeds and diapers, a week of trends against pediatric guidance, and flags with their sources.
 
-> Demo video: `<YOUTUBE LINK>` · Simulated Alexa+ client: run the server and open http://localhost:8000/
+> Demo video: https://youtu.be/TPDbhNsB-cg · Simulated Alexa+ client: run the server and open http://localhost:8000/
 
 ![Swaddle care report](docs/screenshot-report.png)
 
